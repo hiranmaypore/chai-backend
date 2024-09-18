@@ -14,7 +14,7 @@ const connectDB = async  ()=> {
         process.exit(1);
     }
 
-    console.log('This is the uri',process.env.MONGODB_URI);
+    // console.log('This is the uri',process.env.MONGODB_URI);
     
 
 }
