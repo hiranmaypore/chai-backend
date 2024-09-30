@@ -23,7 +23,6 @@ const generateAccessAndRefreshTokens = async(userId) => {  //generating accessTo
 
     } catch (error) {
       console.log(error);
-      
       throw new ApiError(500,'Something went wrong while generating refresh and access token')
     }
 }
@@ -176,4 +175,5 @@ const logoutUser = asyncHandler(async(req,res) =>{
 
 export{registerUser,
   loginUser,
-  logoutUser}
+  logoutUser
+}
