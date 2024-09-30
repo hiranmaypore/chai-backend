@@ -4,7 +4,7 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiError } from "../utils/Apierror.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { isPasswordCorrect } from "../utils/general.js"; //not needed actually
-
+import jwt from "jsonwebtoken"
 
 const generateAccessAndRefreshTokens = async(userId) => {  //generating accessToken and refreshToken
     try {
@@ -173,7 +173,45 @@ const logoutUser = asyncHandler(async(req,res) =>{
 }
 )
 
+const refreshAccessToken = asyncHandler(async(req,res)=>{
+  const incomingrRefreshToken = req.cookies.refreshToken || req.body.refreshToken
+
+  if(!incomingrRefreshToken){
+    throw new ApiError(401,"Unauthorized request");
+  }
+  // verify  token
+ try {
+   const decodedToken = jwt.verify(incomingrRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+ 
+   const user = await User.findById(decodedToken._id)
+   if (!user) {
+     throw new ApiError(401,"Invalid refresh token");
+   }
+ 
+   if(incomingrRefreshToken !== user?.refreshToken){
+     throw new ApiError(401,"Refresh token is expired or used");
+     
+   }
+ 
+   const options = {
+     httpOnly: true,
+     secure:true
+   }
+   const {accessToken, newRefreshToken} = await generateAccessAndRefreshTokens(user._id)
+ 
+   return res.status(200).cookie('accessToken',accessToken,options)
+   .cookie('refreshToken',newRefreshToken,options).json(new ApiResponse(200,{accessToken, refreshToken: newRefreshToken},'AccessToken refreshed'))
+ 
+ 
+ } catch (error) {
+  throw new ApiError(401, error?.message || "Invalid refresh token");
+  
+ }
+
+})
+
 export{registerUser,
   loginUser,
-  logoutUser
+  logoutUser,
+  refreshAccessToken
 }
