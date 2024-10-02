@@ -5,6 +5,7 @@ import { ApiError } from "../utils/Apierror.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { isPasswordCorrect } from "../utils/general.js"; //not needed actually
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async(userId) => {  //generating accessToken and refreshToken
     try {
@@ -265,7 +266,7 @@ const updateAccountDetails = asyncHandler(async(req, res)=>{
 })
 
 const updateAccountAvatar = asyncHandler(async(req, res)=>{
-  const avatarLocalPath = req.files?.path
+  const avatarLocalPath = req.file?.path
   if (!avatarLocalPath) {
     throw new ApiError(404,'Avatar is required')
     
@@ -291,7 +292,7 @@ const updateAccountAvatar = asyncHandler(async(req, res)=>{
 })
 
 const updateUserCoverImage = asyncHandler(async(req, res)=>{
-  const coverImageLocalPath = req.files?.path
+  const coverImageLocalPath = req.file?.path
   if (!coverImageLocalPath) {
     throw new ApiError(404,'Coverimage is required')
     
@@ -383,6 +384,51 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
   return res.status(200).json(new ApiResponse(200,channel[0], 'User channel fetch successfully'))
 })
 
+const getWatchHistory = asyncHandler(async(req, res)=>{
+  const user = await User.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id)
+      }
+    },
+    {
+      $lookup:{
+        from: 'video',
+        localField: 'watchHistory',
+        foreignField: 'watchHistory',
+        as: 'watchHistory',
+        pipeline:[{  // subpipeline
+          $lookup:{
+            from: 'users',
+            localField: 'owner',
+            foreignField: '-id',
+            as: 'owner',
+            pipeline:[{
+              $project:{
+                fullName: 1,
+                username: 1,
+                avatar: 1
+              },
+            }]
+          }
+        },
+        {
+          $addFields:{
+            owner:{
+              $first: '$owner'
+            }
+          }
+        }]
+      }
+    }
+  ])
+
+  if (!user) {
+    throw new ApiError(401,"Cannot find watch history");
+  }
+
+  return res.status(200).json(new ApiResponse(200,user[0].watchHistory,'Watch history fetched successfully'))
+})
 
 
 export{registerUser,
@@ -394,5 +440,6 @@ export{registerUser,
   updateAccountDetails,
   updateAccountAvatar,
   updateUserCoverImage,
-  getUserChannelProfile
+  getUserChannelProfile,
+  getWatchHistory
 }
