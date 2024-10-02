@@ -170,8 +170,7 @@ const logoutUser = asyncHandler(async(req,res) =>{
         throw new ApiError(401,"internal server error");
         
     }
-}
-)
+})
 
 const refreshAccessToken = asyncHandler(async(req,res)=>{
   const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
@@ -290,6 +289,7 @@ const updateAccountAvatar = asyncHandler(async(req, res)=>{
   return res.status(200).json(new ApiResponse(200, user, 'Account details updated successfully'))
 
 })
+
 const updateUserCoverImage = asyncHandler(async(req, res)=>{
   const coverImageLocalPath = req.files?.path
   if (!coverImageLocalPath) {
@@ -316,6 +316,73 @@ const updateUserCoverImage = asyncHandler(async(req, res)=>{
 
 })
 
+const getUserChannelProfile = asyncHandler(async(req, res)=>{
+  const {username} = req.params
+
+  if (!username) {
+    throw new ApiError(401,"Username is missing");
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase()
+      }
+    },
+    {
+      $lookup:{
+        from: 'subscription',
+        localField:'_id',
+        foreignField: 'channel',
+        as: 'subscribers'
+      }
+    },
+    {
+      $lookup:{
+        from: 'subscription',
+        localField:'_id',
+        foreignField: 'subscribers',
+        as: 'subscribedTo'
+      }
+    },
+    {
+      $addFields:{
+        subscribersCount:{
+          size: '$subscribers'
+        },
+        channelSubscribedToCount:{
+          size: '$subscribedTo'
+        },
+        isSubscribed:{
+          $cond:{
+            if: {$in: [req.user?._id,'$subscribers.subscriber']},
+            then: true, //subscribed
+            else: false  //not subscribed
+          }
+        }
+      }
+    },
+    {
+      project:{
+        fullName: 1,
+        username: 1,
+        channelSubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+        email: 1,
+        createdAt: 1
+      }
+    }
+  ])
+
+  if (!channel) {
+    throw new ApiError(404,"channel doesn't exist");
+  }
+
+  return res.status(200).json(new ApiResponse(200,channel[0], 'User channel fetch successfully'))
+})
+
 
 
 export{registerUser,
@@ -326,5 +393,6 @@ export{registerUser,
   getCurrentUser,
   updateAccountDetails,
   updateAccountAvatar,
-  updateUserCoverImage
+  updateUserCoverImage,
+  getUserChannelProfile
 }
